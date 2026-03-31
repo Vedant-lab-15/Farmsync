@@ -54,41 +54,60 @@ farmsync/
 
 ### Prerequisites
 - Node.js 18+
-- MongoDB (local or Atlas)
-- npm or bun
+- MongoDB (local or [Atlas free tier](https://www.mongodb.com/atlas/database))
+- npm
 
-### 1. Clone the repo
+---
+
+### ⚡ Quick Setup (recommended)
+
+A one-command setup script handles everything — dependency installs, `.env` file creation, and JWT secret generation.
 
 ```bash
-git clone https://github.com/your-username/farmsync.git
-cd farmsync
+git clone https://github.com/Vedant-lab-15/Farmsync.git
+cd Farmsync
+bash setup.sh
 ```
 
-### 2. Frontend setup
+**What `setup.sh` does:**
+1. Checks Node.js 18+ is installed
+2. Creates `.env` from `.env.example` (frontend)
+3. Creates `backend/.env` from `backend/.env.example` and auto-generates a random `JWT_SECRET`
+4. Prompts you to set your `MONGODB_URI` (the only required value)
+5. Installs all frontend and backend dependencies
+
+After it finishes, follow the printed instructions to start both servers.
+
+---
+
+### Manual Setup
+
+If you prefer to set things up yourself:
 
 ```bash
+# 1. Clone
+git clone https://github.com/Vedant-lab-15/Farmsync.git
+cd Farmsync
+
+# 2. Frontend
 npm install
 cp .env.example .env
-# Fill in VITE_API_URL and VITE_GOOGLE_MAPS_API_KEY
-```
 
-### 3. Backend setup
-
-```bash
+# 3. Backend
 cd backend
 npm install
 cp .env.example .env
-# Fill in MONGODB_URI, JWT_SECRET, and optionally Twilio keys
+# Edit backend/.env — set MONGODB_URI and JWT_SECRET
+cd ..
 ```
 
-### 4. Run locally
+### Run locally
 
-In two separate terminals:
+Open two terminals in the project root:
 
 ```bash
 # Terminal 1 — backend
-cd backend
-npm run dev
+cd backend && npm run dev
 
 # Terminal 2 — frontend
 npm run dev
