@@ -17,7 +17,7 @@ const faqs = [
   },
   {
     question: 'How do I contact support?',
-    answer: 'You can contact our support team by filling out the contact form on this page or by emailing support@marketstrideagro.com.'
+    answer: 'You can contact our support team by filling out the contact form on this page or by emailing support@farmsync.in.'
   },
   {
     question: 'How do I set up price alerts?',
@@ -95,7 +95,7 @@ const HelpSupport = () => {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Send us an email at <a href="mailto:support@marketstrideagro.com" className="text-primary hover:underline">support@marketstrideagro.com</a>
+              Send us an email at <a href="mailto:support@farmsync.in" className="text-primary hover:underline">support@farmsync.in</a>
             </p>
           </CardContent>
         </Card>

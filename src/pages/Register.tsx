@@ -47,20 +47,20 @@ const Register = () => {
     }
 
     try {
-      const user = await register({
+      const newUser = await registerUser({
         name,
         email,
         password,
         role,
         phoneNumber,
       });
-      
-      if (user) {
+      if (newUser) {
         navigate(role === 'farmer' ? '/' : '/broker/dashboard');
       }
     } catch (err) {
       console.error('Registration error:', err);
-      setError('Registration failed. Please try again.');
+      // error is set in AuthContext, but show local fallback too
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     }
   };
 
@@ -68,7 +68,7 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-primary">Market Stride Agro</h1>
+          <h1 className="text-3xl font-bold text-primary">FarmSync</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Create your {role} account
           </p>

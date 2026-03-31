@@ -6,32 +6,26 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSMS } from '@/contexts/SMSContext';
+import { apiFetch } from '@/lib/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, CheckCircle } from 'lucide-react';
+import { Info, CheckCircle, Loader2 } from 'lucide-react';
 
 const Settings = () => {
-  const { user } = useAuth();
-  const { 
-    preferences, 
-    updatePreferences,
-    sendPriceAlert,
-    sendOTP,
-    sendTransactionConfirmation,
-    sendBrokerConnectionRequest,
-    sendPaymentReminder
-  } = useSMS();
-  
+  const { user, logout } = useAuth();
+  const { preferences, updatePreferences, sendOTP } = useSMS();
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
     phoneNumber: user?.phoneNumber || '',
   });
-  
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [testMessage, setTestMessage] = useState('');
-  const [testResult, setTestResult] = useState<{success: boolean; message: string} | null>(null);
-  
-  // Update form data when user data is loaded
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isTestSending, setIsTestSending] = useState(false);
+
   useEffect(() => {
     if (user) {
       setFormData({
@@ -43,105 +37,111 @@ const Settings = () => {
   }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setIsSaving(true);
+    setSaveError(null);
+
     try {
-      // In a real app, this would update the user's settings via an API
-      console.log('Updated settings:', { ...formData, preferences });
-      
-      // Show success message
+      const res = await apiFetch('/api/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phoneNumber,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to save settings');
+
+      // Update local storage with new name
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        localStorage.setItem('user', JSON.stringify({ ...parsed, name: formData.name }));
+      }
+
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 5000);
-      
-    } catch (error) {
-      console.error('Failed to update settings:', error);
+      setTimeout(() => setShowSuccess(false), 4000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save settings');
+    } finally {
+      setIsSaving(false);
     }
   };
-  
+
   const handleTestSMS = async () => {
     if (!testMessage.trim()) {
       setTestResult({ success: false, message: 'Please enter a test message' });
       return;
     }
-    
+    setIsTestSending(true);
     try {
-      // Use the sendOTP function as a general test message sender
       const success = await sendOTP(testMessage);
-      
-      if (success) {
-        setTestResult({ 
-          success: true, 
-          message: 'Test SMS sent successfully! Please check your phone.' 
-        });
-      } else {
-        setTestResult({ 
-          success: false, 
-          message: 'Failed to send test SMS. Please check your phone number and try again.' 
-        });
-      }
-    } catch (error) {
-      console.error('Error sending test SMS:', error);
-      setTestResult({ 
-        success: false, 
-        message: 'An error occurred while sending the test SMS.' 
+      setTestResult({
+        success,
+        message: success
+          ? 'Test SMS sent successfully! Check your phone.'
+          : 'Failed to send. Check your phone number and try again.',
       });
+    } catch {
+      setTestResult({ success: false, message: 'An error occurred while sending.' });
+    } finally {
+      setIsTestSending(false);
+      setTestMessage('');
+      setTimeout(() => setTestResult(null), 5000);
     }
-    
-    // Clear the test message
-    setTestMessage('');
-    
-    // Clear the result after 5 seconds
-    setTimeout(() => setTestResult(null), 5000);
+  };
+
+  const handleDeleteAccount = () => {
+    // In production: call DELETE /api/users/me, then logout
+    if (window.confirm('Are you sure? This action cannot be undone.')) {
+      logout();
+    }
   };
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 max-w-3xl">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Account Settings</h1>
         {showSuccess && (
-          <div className="flex items-center space-x-2 bg-green-50 text-green-700 px-4 py-2 rounded-md">
-            <CheckCircle className="h-5 w-5" />
-            <span>Settings saved successfully!</span>
+          <div className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-md text-sm">
+            <CheckCircle className="h-4 w-4" />
+            Settings saved successfully!
           </div>
         )}
       </div>
-      
-      <Card className="mb-8">
+
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Profile Information</CardTitle>
-          <CardDescription>Update your account's profile information and email address.</CardDescription>
+          <CardDescription>Changes are saved to your account immediately.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {saveError && (
+              <Alert variant="destructive">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{saveError}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                />
+                <Input id="name" name="name" value={formData.name} onChange={handleChange} />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                />
+                <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} disabled />
+                <p className="text-xs text-muted-foreground">Email cannot be changed here.</p>
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="phoneNumber">Phone Number</Label>
                 <Input
                   id="phoneNumber"
@@ -149,132 +149,79 @@ const Settings = () => {
                   type="tel"
                   value={formData.phoneNumber}
                   onChange={handleChange}
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="+91 9876543210"
                 />
               </div>
             </div>
 
-            <div className="pt-4">
-              <h3 className="text-lg font-medium mb-4">SMS Notification Preferences</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="priceAlerts">Price Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Receive alerts when crop prices change</p>
-                  </div>
-                  <Switch
-                    id="priceAlerts"
-                    checked={preferences.priceAlerts}
-                    onCheckedChange={(checked) => 
-                      updatePreferences({ priceAlerts: checked })
-                    }
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="transactionAlerts">Transaction Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Get notified about your transactions</p>
-                  </div>
-                  <Switch
-                    id="transactionAlerts"
-                    checked={preferences.transactionAlerts}
-                    onCheckedChange={(checked) => 
-                      updatePreferences({ transactionAlerts: checked })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="connectionRequests">Connection Requests</Label>
-                    <p className="text-sm text-muted-foreground">Get notified about new connection requests</p>
-                  </div>
-                  <Switch
-                    id="connectionRequests"
-                    checked={preferences.connectionRequests}
-                    onCheckedChange={(checked) => 
-                      updatePreferences({ connectionRequests: checked })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="paymentReminders">Payment Reminders</Label>
-                    <p className="text-sm text-muted-foreground">Get reminders for upcoming payments</p>
-                  </div>
-                  <Switch
-                    id="paymentReminders"
-                    checked={preferences.paymentReminders}
-                    onCheckedChange={(checked) => 
-                      updatePreferences({ paymentReminders: checked })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="marketing">Marketing Messages</Label>
-                    <p className="text-sm text-muted-foreground">Receive promotional offers and updates</p>
-                  </div>
-                  <Switch
-                    id="marketing"
-                    checked={preferences.marketing}
-                    onCheckedChange={(checked) => 
-                      updatePreferences({ marketing: checked })
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-6">
-              <h3 className="text-lg font-medium mb-4">Test SMS Notifications</h3>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Input
-                    type="text"
-                    placeholder="Enter a test message"
-                    value={testMessage}
-                    onChange={(e) => setTestMessage(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button 
-                    type="button" 
-                    onClick={handleTestSMS}
-                    disabled={!user?.phoneNumber}
-                  >
-                    Send Test SMS
-                  </Button>
-                </div>
-                {testResult && (
-                  <Alert variant={testResult.success ? 'default' : 'destructive'}>
-                    {testResult.success ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Info className="h-4 w-4" />
-                    )}
-                    <AlertTitle>
-                      {testResult.success ? 'Success!' : 'Error'}
-                    </AlertTitle>
-                    <AlertDescription>
-                      {testResult.message}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {!user?.phoneNumber && (
-                  <p className="text-sm text-yellow-600">
-                    Please add a phone number to test SMS notifications.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-4">
-              <Button type="submit">Save Changes</Button>
+            <div className="flex justify-end">
+              <Button type="submit" disabled={isSaving} className="bg-green-600 hover:bg-green-700">
+                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Changes'}
+              </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>SMS Notification Preferences</CardTitle>
+          <CardDescription>Control which notifications you receive via SMS.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { key: 'priceAlerts' as const, label: 'Price Alerts', desc: 'Receive alerts when crop prices change' },
+            { key: 'transactionAlerts' as const, label: 'Transaction Alerts', desc: 'Get notified about your transactions' },
+            { key: 'connectionRequests' as const, label: 'Connection Requests', desc: 'Get notified about new connection requests' },
+            { key: 'paymentReminders' as const, label: 'Payment Reminders', desc: 'Get reminders for upcoming payments' },
+            { key: 'marketing' as const, label: 'Marketing Messages', desc: 'Receive promotional offers and updates' },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between py-2 border-b last:border-0">
+              <div>
+                <Label htmlFor={key}>{label}</Label>
+                <p className="text-sm text-muted-foreground">{desc}</p>
+              </div>
+              <Switch
+                id={key}
+                checked={preferences[key]}
+                onCheckedChange={(checked) => updatePreferences({ [key]: checked })}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Test SMS</CardTitle>
+          <CardDescription>Send a test message to verify your SMS setup.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter a test message"
+              value={testMessage}
+              onChange={(e) => setTestMessage(e.target.value)}
+              disabled={!user?.phoneNumber || isTestSending}
+            />
+            <Button
+              type="button"
+              onClick={handleTestSMS}
+              disabled={!user?.phoneNumber || isTestSending}
+            >
+              {isTestSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
+            </Button>
+          </div>
+          {!user?.phoneNumber && (
+            <p className="text-sm text-yellow-600">Add a phone number above to test SMS.</p>
+          )}
+          {testResult && (
+            <Alert variant={testResult.success ? 'default' : 'destructive'}>
+              {testResult.success ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Info className="h-4 w-4" />}
+              <AlertTitle>{testResult.success ? 'Sent!' : 'Failed'}</AlertTitle>
+              <AlertDescription>{testResult.message}</AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
@@ -286,12 +233,10 @@ const Settings = () => {
         <CardContent>
           <div className="flex justify-between items-center">
             <div>
-              <h4 className="font-medium">Delete Account</h4>
-              <p className="text-sm text-muted-foreground">
-                Permanently delete your account and all associated data
-              </p>
+              <p className="font-medium">Delete Account</p>
+              <p className="text-sm text-muted-foreground">Permanently delete your account and all associated data</p>
             </div>
-            <Button variant="destructive">Delete Account</Button>
+            <Button variant="destructive" onClick={handleDeleteAccount}>Delete Account</Button>
           </div>
         </CardContent>
       </Card>

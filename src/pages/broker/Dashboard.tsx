@@ -1,49 +1,68 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Package, 
-  Users, 
-  DollarSign, 
-  BarChart3, 
-  MessageSquare,
-  Bell,
-  Settings,
-  LogOut as LogOutIcon,
-  HelpCircle
-} from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Package, Users, DollarSign, BarChart3, MessageSquare,
+  Bell, Settings, LogOut as LogOutIcon, HelpCircle, Leaf,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiFetch } from '@/lib/api';
+import { BrokerListingsTab } from '@/components/broker/BrokerListingsTab';
+import { BrokerFarmersTab } from '@/components/broker/BrokerFarmersTab';
+import { BrokerTransactionsTab } from '@/components/broker/BrokerTransactionsTab';
 
-// Mock data - in a real app, this would come from an API
-const mockBrokerData = {
-  name: "Rajesh Kumar",
-  rating: 4.7,
-  totalTransactions: 124,
-  activeListings: 8,
-  totalEarnings: 245000,
-  recentActivity: [
-    { id: 1, type: 'new_offer', message: 'New offer received for 50kg tomatoes', time: '2 hours ago' },
-    { id: 2, type: 'price_update', message: 'Price updated for onions', time: '5 hours ago' },
-    { id: 3, type: 'new_message', message: 'New message from Farmer Ramesh', time: '1 day ago' },
-  ],
-  marketStats: {
-    totalFarmers: 87,
-    activeDeals: 12,
-    pendingPayments: 2,
-    avgTransactionValue: 18500,
-  }
-};
+interface MenuItem {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  onClick?: () => void;
+}
 
 const BrokerDashboard = () => {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState('overview');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
-    navigate('/login?role=broker');
+    navigate('/login');
+  };
+
+  const menuItems: MenuItem[] = [
+    { id: 'overview', name: 'Dashboard', icon: BarChart3 },
+    { id: 'listings', name: 'My Listings', icon: Package },
+    { id: 'farmers', name: 'Farmers', icon: Users },
+    { id: 'transactions', name: 'Transactions', icon: DollarSign },
+    { id: 'messages', name: 'Messages', icon: MessageSquare },
+    { id: 'notifications', name: 'Notifications', icon: Bell },
+    { id: 'settings', name: 'Settings', icon: Settings, onClick: () => navigate('/settings') },
+    { id: 'help', name: 'Help & Support', icon: HelpCircle, onClick: () => navigate('/help') },
+    { id: 'logout', name: 'Sign Out', icon: LogOutIcon, onClick: handleLogout },
+  ];
+
+  // Fetch broker overview from API
+  const { data: overviewData } = useQuery({
+    queryKey: ['brokerOverview'],
+    queryFn: async () => {
+      const res = await apiFetch('/api/users/overview');
+      if (!res.ok) throw new Error('Failed to fetch overview');
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
+  const stats = overviewData?.data?.stats;
+
+  const tabTitle: Record<string, string> = {
+    overview: 'Dashboard',
+    listings: 'My Listings',
+    farmers: 'Farmers',
+    transactions: 'Transactions',
+    messages: 'Messages',
+    notifications: 'Notifications',
+    settings: 'Settings',
   };
 
   return (
@@ -52,147 +71,134 @@ const BrokerDashboard = () => {
       <div className="hidden md:flex md:flex-shrink-0">
         <div className="flex flex-col w-64 border-r border-gray-200 bg-white">
           <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto">
-            <div className="flex items-center flex-shrink-0 px-4">
-              <h1 className="text-xl font-bold text-primary">Broker Portal</h1>
+            <div className="flex items-center flex-shrink-0 px-4 mb-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-emerald-500 rounded-lg flex items-center justify-center">
+                <Leaf className="h-5 w-5 text-white" />
+              </div>
+              <div className="ml-3">
+                <h1 className="text-lg font-bold text-gray-900">FarmSync</h1>
+                <p className="text-xs text-gray-500">Broker Portal</p>
+              </div>
             </div>
-            <div className="px-4 mt-6">
+            <div className="px-4 py-3 border-b border-gray-100 mb-2">
               <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <span className="font-medium text-lg">
-                      {user?.name?.charAt(0) || 'B'}
-                    </span>
-                  </div>
+                <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-semibold">
+                  {user?.name?.charAt(0) || 'B'}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-700">{user?.name || 'Broker'}</p>
-                  <p className="text-xs text-gray-500">Broker ID: {user?.id?.substring(0, 8) || 'BROKER'}</p>
+                  <p className="text-xs text-gray-500">ID: {user?.id?.substring(0, 8) || 'BROKER'}</p>
                 </div>
               </div>
             </div>
-            <nav className="mt-6 flex-1 px-2 space-y-1">
+            <nav className="flex-1 px-2 space-y-1">
               {menuItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={item.onClick ? item.onClick : () => setActiveTab(item.id)}
-                  className={`flex items-center w-full px-4 py-2 text-sm font-medium rounded-md ${
-                    (activeTab === item.id || activeTab === item.tab)
-                      ? 'bg-primary/10 text-primary'
+                  className={`flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === item.id
+                      ? 'bg-green-50 text-green-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >
-                  <item.icon className="mr-3 h-5 w-5" />
+                  <item.icon className={`mr-3 h-5 w-5 ${activeTab === item.id ? 'text-green-500' : 'text-gray-400'}`} />
                   {item.name}
                 </button>
               ))}
-              <button
-                onClick={handleLogout}
-                className="flex items-center w-full px-4 py-2 mt-4 text-sm font-medium text-red-600 rounded-md hover:bg-red-50"
-              >
-                <LogOutIcon className="mr-3 h-5 w-5" />
-                Sign Out
-              </button>
             </nav>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="flex-1 overflow-auto focus:outline-none">
-        <div className="sticky top-0 z-10 bg-white shadow-sm">
-          <div className="px-4 py-4 sm:px-6 lg:px-8
-           flex justify-between items-center">
+      <div className="flex-1 overflow-auto">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+          <div className="px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
             <h1 className="text-2xl font-semibold text-gray-900">
-              {activeTab === 'overview' && 'Dashboard'}
-              {activeTab === 'listings' && 'My Listings'}
-              {activeTab === 'farmers' && 'Farmers'}
-              {activeTab === 'transactions' && 'Transactions'}
-              {activeTab === 'messages' && 'Messages'}
-              {activeTab === 'notifications' && 'Notifications'}
-              {activeTab === 'settings' && 'Settings'}
+              {tabTitle[activeTab] || activeTab}
             </h1>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
+            <div className="flex items-center space-x-3">
+              <Button variant="outline" size="sm" className="relative">
                 <Bell className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Notifications</span>
                 <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
               </Button>
-              <Button size="sm" onClick={() => navigate('/broker/listings/new')}>
+              <Button size="sm" className="bg-green-600 hover:bg-green-700">
                 + New Listing
               </Button>
             </div>
           </div>
         </div>
 
-        <main className="flex-1 pb-8">
+        <main className="pb-8">
           <div className="px-4 sm:px-6 lg:px-8 py-8">
-            {/* Dashboard Overview */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
-                {/* Stats Cards */}
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Total Earnings
-                      </CardTitle>
+                      <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">₹{mockBrokerData.totalEarnings.toLocaleString()}</div>
-                      <p className="text-xs text-muted-foreground">+12% from last month</p>
+                      <div className="text-2xl font-bold">
+                        ₹{(stats?.totalRevenue ?? 245000).toLocaleString('en-IN')}
+                      </div>
+                      <p className="text-xs text-green-600">+12% from last month</p>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Active Listings</CardTitle>
                       <Package className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{mockBrokerData.activeListings}</div>
-                      <p className="text-xs text-muted-foreground">+2 from last week</p>
+                      <div className="text-2xl font-bold">{stats?.activeListings ?? 8}</div>
+                      <p className="text-xs text-green-600">+2 from last week</p>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Active Farmers</CardTitle>
                       <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{mockBrokerData.marketStats.totalFarmers}</div>
-                      <p className="text-xs text-muted-foreground">+5 from last month</p>
+                      <div className="text-2xl font-bold">87</div>
+                      <p className="text-xs text-green-600">+5 from last month</p>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Avg. Transaction</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">₹{mockBrokerData.marketStats.avgTransactionValue.toLocaleString()}</div>
-                      <p className="text-xs text-muted-foreground">+8% from last month</p>
+                      <div className="text-2xl font-bold">₹18,500</div>
+                      <p className="text-xs text-green-600">+8% from last month</p>
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* Recent Activity & Quick Actions */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                   <Card className="lg:col-span-2">
                     <CardHeader>
                       <CardTitle>Recent Activity</CardTitle>
-                      <CardDescription>
-                        Your recent activities and notifications
-                      </CardDescription>
+                      <CardDescription>Your recent activities and notifications</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {mockBrokerData.recentActivity.map((activity) => (
-                          <div key={activity.id} className="flex items-start pb-4 last:pb-0">
-                            <div className="rounded-full bg-primary/10 p-2 mr-3">
-                              <Bell className="h-4 w-4 text-primary" />
+                        {[
+                          { id: 1, message: 'New offer received for 50kg tomatoes', time: '2 hours ago' },
+                          { id: 2, message: 'Price updated for onions', time: '5 hours ago' },
+                          { id: 3, message: 'New message from Farmer Ramesh', time: '1 day ago' },
+                        ].map((activity) => (
+                          <div key={activity.id} className="flex items-start pb-4 last:pb-0 border-b last:border-0">
+                            <div className="rounded-full bg-green-100 p-2 mr-3">
+                              <Bell className="h-4 w-4 text-green-600" />
                             </div>
                             <div className="flex-1">
                               <p className="text-sm font-medium">{activity.message}</p>
@@ -204,7 +210,7 @@ const BrokerDashboard = () => {
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <div className="space-y-6">
                     <Card>
                       <CardHeader>
@@ -213,24 +219,20 @@ const BrokerDashboard = () => {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <Button variant="outline" className="w-full justify-start">
-                          <Package className="mr-2 h-4 w-4" />
-                          Create New Listing
+                          <Package className="mr-2 h-4 w-4" /> Create New Listing
                         </Button>
                         <Button variant="outline" className="w-full justify-start">
-                          <Users className="mr-2 h-4 w-4" />
-                          Add New Farmer
+                          <Users className="mr-2 h-4 w-4" /> Add New Farmer
                         </Button>
                         <Button variant="outline" className="w-full justify-start">
-                          <DollarSign className="mr-2 h-4 w-4" />
-                          Record Payment
+                          <DollarSign className="mr-2 h-4 w-4" /> Record Payment
                         </Button>
                         <Button variant="outline" className="w-full justify-start">
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          Send Bulk Message
+                          <MessageSquare className="mr-2 h-4 w-4" /> Send Bulk Message
                         </Button>
                       </CardContent>
                     </Card>
-                    
+
                     <Card>
                       <CardHeader>
                         <CardTitle>Performance</CardTitle>
@@ -238,16 +240,12 @@ const BrokerDashboard = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center space-x-2">
-                          <div className="text-3xl font-bold">{mockBrokerData.rating}</div>
+                          <div className="text-3xl font-bold">{stats?.averageRating ?? 4.7}</div>
                           <div className="flex">
                             {[...Array(5)].map((_, i) => (
                               <svg
                                 key={i}
-                                className={`h-5 w-5 ${
-                                  i < Math.floor(mockBrokerData.rating)
-                                    ? 'text-yellow-400'
-                                    : 'text-gray-300'
-                                }`}
+                                className={`h-5 w-5 ${i < Math.floor(stats?.averageRating ?? 4.7) ? 'text-yellow-400' : 'text-gray-300'}`}
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                               >
@@ -257,11 +255,8 @@ const BrokerDashboard = () => {
                           </div>
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          Based on {mockBrokerData.totalTransactions} transactions
+                          Based on {stats?.totalShipments ?? 124} transactions
                         </p>
-                        <Button variant="link" className="mt-4 p-0 h-auto text-sm">
-                          View detailed stats
-                        </Button>
                       </CardContent>
                     </Card>
                   </div>
@@ -269,19 +264,18 @@ const BrokerDashboard = () => {
               </div>
             )}
 
-            {/* Other tabs content would go here */}
-            {activeTab !== 'overview' && (
+            {activeTab === 'listings' && <BrokerListingsTab />}
+            {activeTab === 'farmers' && <BrokerFarmersTab />}
+            {activeTab === 'transactions' && <BrokerTransactionsTab />}
+
+            {activeTab !== 'overview' && activeTab !== 'listings' && activeTab !== 'farmers' && activeTab !== 'transactions' && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="capitalize">{activeTab}</CardTitle>
-                  <CardDescription>
-                    {`This is the ${activeTab} section. Content will be added soon.`}
-                  </CardDescription>
+                  <CardTitle className="capitalize">{tabTitle[activeTab] || activeTab}</CardTitle>
+                  <CardDescription>This section is under development.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">
-                    This section is under development. Please check back later for updates.
-                  </p>
+                  <p className="text-muted-foreground">Content coming soon.</p>
                 </CardContent>
               </Card>
             )}

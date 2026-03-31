@@ -39,35 +39,55 @@ export const MarketPrices = () => {
   const [cropPrices, setCropPrices] = useState<CropPrice[]>([]);
 
   useEffect(() => {
-    const fetchMarketPrices = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/market', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          // Transform the data to match the expected format
-          const transformedData = data.data?.map((item: any) => ({
-            name: item.crop,
-            currentPrice: item.price,
-            previousPrice: item.price * (1 - item.change / 100),
-            unit: item.unit,
-            trend: item.trend,
-            changePercent: item.change,
-            market: item.market,
-          })) || [];
-          setCropPrices(transformedData);
-        }
-      } catch (error) {
-        console.error('Failed to fetch market prices:', error);
+    // Mango-specific dummy data
+    const mangoPrices: CropPrice[] = [
+      {
+        name: "Alphonso Mango",
+        currentPrice: 150,
+        previousPrice: 140,
+        unit: "kg",
+        trend: "up",
+        changePercent: 7.14,
+        market: "Ratnagiri Fruit Market"
+      },
+      {
+        name: "Kesar Mango",
+        currentPrice: 130,
+        previousPrice: 135,
+        unit: "kg",
+        trend: "down",
+        changePercent: -3.7,
+        market: "Junagadh Market"
+      },
+      {
+        name: "Dasheri Mango",
+        currentPrice: 120,
+        previousPrice: 120,
+        unit: "kg",
+        trend: "neutral",
+        changePercent: 0,
+        market: "Lucknow Market"
+      },
+      {
+        name: "Langra Mango",
+        currentPrice: 110,
+        previousPrice: 105,
+        unit: "kg",
+        trend: "up",
+        changePercent: 4.76,
+        market: "Varanasi Market"
+      },
+      {
+        name: "Himsagar Mango",
+        currentPrice: 140,
+        previousPrice: 145,
+        unit: "kg",
+        trend: "down",
+        changePercent: -3.45,
+        market: "West Bengal Market"
       }
-    };
-
-    fetchMarketPrices();
+    ];
+    setCropPrices(mangoPrices);
   }, []);
 
   return (
